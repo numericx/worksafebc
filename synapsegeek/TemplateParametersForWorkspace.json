@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"value": "synapsegeek"
+		},
+		"HulkADLSGen2_accountKey": {
+			"value": ""
+		},
+		"callcenter_connectionString": {
+			"value": ""
+		},
+		"callcenterinsights_connectionString": {
+			"value": ""
+		},
+		"synapsegeek-WorkspaceDefaultSqlServer_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synapsegeek.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"worksafebcasa_connectionString": {
+			"value": ""
+		},
+		"HulkADLSGen2_properties_typeProperties_url": {
+			"value": "https://hulkadls2.dfs.core.windows.net/"
+		},
+		"synapsegeek-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://hulkadls2.dfs.core.windows.net"
+		}
+	}
+}

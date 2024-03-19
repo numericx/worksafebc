@@ -1,0 +1,1124 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "synapsegeek"
+		},
+		"HulkADLSGen2_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'HulkADLSGen2'"
+		},
+		"callcenter_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'callcenter'"
+		},
+		"callcenterinsights_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'callcenterinsights'"
+		},
+		"synapsegeek-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'synapsegeek-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:synapsegeek.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"worksafebcasa_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'worksafebcasa'"
+		},
+		"HulkADLSGen2_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://hulkadls2.dfs.core.windows.net/"
+		},
+		"synapsegeek-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://hulkadls2.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/CopyJsonFilesADLS2')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "Copy each Json files into the datalake.",
+				"activities": [
+					{
+						"name": "GetFilenames",
+						"description": "Get the JSON filenames from the WorksafeBC storage account",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "WorksafeBCJsonMetadata",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "ForEachJson",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GetFilenames",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GetFilenames').output.childItems",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "CopyJson",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings",
+												"copyBehavior": "PreserveHierarchy"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "WorksafeBCJsonFiles",
+											"type": "DatasetReference",
+											"parameters": {
+												"Filename": {
+													"value": "@item().Name",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "HulkADLS2Json",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-02-08T20:48:16Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/WorksafeBCJsonMetadata')]",
+				"[concat(variables('workspaceId'), '/datasets/WorksafeBCJsonFiles')]",
+				"[concat(variables('workspaceId'), '/datasets/HulkADLS2Json')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ETLJsonFilesADLS2')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetFilenames",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "WorksafeBCJsonMetadata",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "ForEachJson",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GetFilenames",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('GetFilenames').output.childItems",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "ETLJsonFIle",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "WorksafeBCJsonFlow",
+											"type": "DataFlowReference",
+											"parameters": {
+												"Filename": {
+													"value": "'@{item().Name}'",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"WorksafeBCJsonStream": {
+													"Filename": {
+														"value": "@item().Name",
+														"type": "Expression"
+													}
+												},
+												"CosmosDBSink": {}
+											}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-02-12T17:13:56Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/WorksafeBCJsonMetadata')]",
+				"[concat(variables('workspaceId'), '/dataflows/WorksafeBCJsonFlow')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AzurePostgreSqlTable1')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "callcenter",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "AzurePostgreSqlTable",
+				"schema": [
+					{
+						"name": "userid",
+						"type": "character varying",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "callid",
+						"type": "character varying",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "timestamp",
+						"type": "timestamp without time zone",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "duration",
+						"type": "character varying",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "summary",
+						"type": "text",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "topics",
+						"type": "ARRAY",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "keyitems",
+						"type": "ARRAY",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "companies",
+						"type": "ARRAY",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "peoples",
+						"type": "ARRAY",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "sentiment",
+						"type": "character varying",
+						"precision": 0,
+						"scale": 0
+					},
+					{
+						"name": "category",
+						"type": "text",
+						"precision": 0,
+						"scale": 0
+					}
+				],
+				"typeProperties": {
+					"schema": "public",
+					"table": "callcenter"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/callcenter')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/HulkADLS2Json')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "HulkADLSGen2",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "json",
+						"fileSystem": "hulkdfs"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"Volcano Name": {
+							"type": "string"
+						},
+						"Country": {
+							"type": "string"
+						},
+						"Region": {
+							"type": "string"
+						},
+						"Location": {
+							"type": "object",
+							"properties": {
+								"type": {
+									"type": "string"
+								},
+								"coordinates": {
+									"type": "array",
+									"items": {
+										"type": "number"
+									}
+								}
+							}
+						},
+						"Elevation": {
+							"type": "integer"
+						},
+						"Type": {
+							"type": "string"
+						},
+						"Status": {
+							"type": "string"
+						},
+						"Last Known Eruption": {
+							"type": "string"
+						},
+						"id": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/HulkADLSGen2')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorksafeBCJsonFiles')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "worksafebcasa",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().Filename",
+							"type": "Expression"
+						},
+						"container": "aoai-json-result-output"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"source": {
+							"type": "string"
+						},
+						"timeStamp": {
+							"type": "string"
+						},
+						"durationInTicks": {
+							"type": "integer"
+						},
+						"duration": {
+							"type": "string"
+						},
+						"combinedRecognizedPhrases": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"channel": {
+										"type": "integer"
+									},
+									"lexical": {
+										"type": "string"
+									},
+									"itn": {
+										"type": "string"
+									},
+									"maskedITN": {
+										"type": "string"
+									},
+									"display": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"recognizedPhrases": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"recognitionStatus": {
+										"type": "string"
+									},
+									"channel": {
+										"type": "integer"
+									},
+									"speaker": {
+										"type": "integer"
+									},
+									"offset": {
+										"type": "string"
+									},
+									"duration": {
+										"type": "string"
+									},
+									"offsetInTicks": {
+										"type": "integer"
+									},
+									"durationInTicks": {
+										"type": "integer"
+									},
+									"nBest": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"confidence": {
+													"type": "number"
+												},
+												"lexical": {
+													"type": "string"
+												},
+												"itn": {
+													"type": "string"
+												},
+												"maskedITN": {
+													"type": "string"
+												},
+												"display": {
+													"type": "string"
+												},
+												"sentiment": {
+													"type": "object",
+													"properties": {
+														"negative": {
+															"type": "number"
+														},
+														"neutral": {
+															"type": "number"
+														},
+														"positive": {
+															"type": "number"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"conversation": {
+							"type": "string"
+						},
+						"summary": {
+							"type": "string"
+						},
+						"topic": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"key_items": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"ner": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"Companies": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									},
+									"People": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						},
+						"sentiment": {
+							"type": "string"
+						},
+						"category": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/worksafebcasa')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorksafeBCJsonMetadata')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "worksafebcasa",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "aoai-json-result-output"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"source": {
+							"type": "string"
+						},
+						"timeStamp": {
+							"type": "string"
+						},
+						"durationInTicks": {
+							"type": "integer"
+						},
+						"duration": {
+							"type": "string"
+						},
+						"combinedRecognizedPhrases": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"channel": {
+										"type": "integer"
+									},
+									"lexical": {
+										"type": "string"
+									},
+									"itn": {
+										"type": "string"
+									},
+									"maskedITN": {
+										"type": "string"
+									},
+									"display": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"recognizedPhrases": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"recognitionStatus": {
+										"type": "string"
+									},
+									"channel": {
+										"type": "integer"
+									},
+									"speaker": {
+										"type": "integer"
+									},
+									"offset": {
+										"type": "string"
+									},
+									"duration": {
+										"type": "string"
+									},
+									"offsetInTicks": {
+										"type": "integer"
+									},
+									"durationInTicks": {
+										"type": "integer"
+									},
+									"nBest": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"confidence": {
+													"type": "number"
+												},
+												"lexical": {
+													"type": "string"
+												},
+												"itn": {
+													"type": "string"
+												},
+												"maskedITN": {
+													"type": "string"
+												},
+												"display": {
+													"type": "string"
+												},
+												"sentiment": {
+													"type": "object",
+													"properties": {
+														"negative": {
+															"type": "number"
+														},
+														"neutral": {
+															"type": "number"
+														},
+														"positive": {
+															"type": "number"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"conversation": {
+							"type": "string"
+						},
+						"summary": {
+							"type": "string"
+						},
+						"topic": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"key_items": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"ner": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"Companies": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									},
+									"People": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						},
+						"sentiment": {
+							"type": "string"
+						},
+						"category": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/worksafebcasa')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/HulkADLSGen2')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('HulkADLSGen2_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('HulkADLSGen2_accountKey')]"
+					}
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/callcenter')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzurePostgreSql",
+				"typeProperties": {
+					"connectionString": "[parameters('callcenter_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/callcenterinsights')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzurePostgreSql",
+				"typeProperties": {
+					"connectionString": "[parameters('callcenterinsights_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/synapsegeek-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('synapsegeek-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/synapsegeek-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('synapsegeek-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/worksafebcasa')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('worksafebcasa_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorksafeBCJsonFlow')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "WorksafeBCJsonFiles",
+								"type": "DatasetReference"
+							},
+							"name": "WorksafeBCJsonStream"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "AzurePostgreSqlTable1",
+								"type": "DatasetReference"
+							},
+							"name": "CosmosDBSink",
+							"description": "Add a CosmosDB PostgreSQL sink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "SelectRelevantColumns"
+						},
+						{
+							"name": "ETL",
+							"description": "Doing some ETL"
+						},
+						{
+							"name": "ReorganiseColumns"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     Filename as string",
+						"}",
+						"source(output(",
+						"          source as string,",
+						"          timeStamp as string,",
+						"          durationInTicks as integer,",
+						"          duration as string,",
+						"          combinedRecognizedPhrases as (channel as integer, lexical as string, itn as string, maskedITN as string, display as string)[],",
+						"          recognizedPhrases as (recognitionStatus as string, channel as integer, speaker as integer, offset as string, duration as string, offsetInTicks as integer, durationInTicks as integer, nBest as (confidence as double, lexical as string, itn as string, maskedITN as string, display as string, sentiment as (negative as double, neutral as double, positive as double))[])[],",
+						"          conversation as string,",
+						"          summary as string,",
+						"          topic as string[],",
+						"          key_items as string[],",
+						"          ner as (Companies as string[], People as string[])[],",
+						"          sentiment as string,",
+						"          category as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     documentForm: 'singleDocument',",
+						"     partitionBy('hash', 1)) ~> WorksafeBCJsonStream",
+						"WorksafeBCJsonStream select(mapColumn(",
+						"          source,",
+						"          timestamp = timeStamp,",
+						"          duration,",
+						"          summary,",
+						"          topics = topic,",
+						"          keyitems = key_items,",
+						"          ner,",
+						"          sentiment,",
+						"          category",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> SelectRelevantColumns",
+						"SelectRelevantColumns derive(callid = regexExtract(at(split(source, '--'), 1), '(\\\\d+)', 1),",
+						"          userid = at(split(at(split(source, '--'), 2), '%'), 1),",
+						"          sentiment = initCap(sentiment),",
+						"          category = initCap(category),",
+						"          timestamp = toTimestamp(timestamp, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"),",
+						"          companies = at(ner, 1).Companies,",
+						"          peoples = at(ner, 1).People) ~> ETL",
+						"ETL select(mapColumn(",
+						"          userid,",
+						"          callid,",
+						"          timestamp,",
+						"          duration,",
+						"          summary,",
+						"          topics,",
+						"          keyitems,",
+						"          companies,",
+						"          peoples,",
+						"          sentiment,",
+						"          category",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> ReorganiseColumns",
+						"ReorganiseColumns sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          userid as string,",
+						"          callid as string,",
+						"          timestamp as timestamp,",
+						"          duration as string,",
+						"          summary as string,",
+						"          topics as string[],",
+						"          keyitems as string[],",
+						"          companies as string[],",
+						"          peoples as string[],",
+						"          sentiment as string,",
+						"          category as string",
+						"     ),",
+						"     stagingSchemaName: 'public',",
+						"     deletable:false,",
+						"     insertable:true,",
+						"     updateable:false,",
+						"     upsertable:false,",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     mapColumn(",
+						"          userid,",
+						"          callid,",
+						"          timestamp,",
+						"          duration,",
+						"          summary,",
+						"          topics,",
+						"          keyitems,",
+						"          companies,",
+						"          peoples,",
+						"          sentiment,",
+						"          category",
+						"     ),",
+						"     partitionBy('hash', 1)) ~> CosmosDBSink"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/WorksafeBCJsonFiles')]",
+				"[concat(variables('workspaceId'), '/datasets/AzurePostgreSqlTable1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/sparkgeek')]",
+			"type": "Microsoft.Synapse/workspaces/bigDataPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"autoPause": {
+					"enabled": true,
+					"delayInMinutes": 15
+				},
+				"autoScale": {
+					"enabled": true,
+					"maxNodeCount": 10,
+					"minNodeCount": 3
+				},
+				"nodeCount": 0,
+				"nodeSize": "Large",
+				"nodeSizeFamily": "MemoryOptimized",
+				"sparkVersion": "3.3",
+				"isComputeIsolationEnabled": false,
+				"sessionLevelPackagesEnabled": true,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "eastus"
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQLPool')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "eastus"
+		}
+	]
+}
