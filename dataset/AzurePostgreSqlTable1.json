@@ -1,0 +1,84 @@
+{
+	"name": "AzurePostgreSqlTable1",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "callcenter",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzurePostgreSqlTable",
+		"schema": [
+			{
+				"name": "userid",
+				"type": "character varying",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "callid",
+				"type": "character varying",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "timestamp",
+				"type": "timestamp without time zone",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "duration",
+				"type": "character varying",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "summary",
+				"type": "text",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "topics",
+				"type": "ARRAY",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "keyitems",
+				"type": "ARRAY",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "companies",
+				"type": "ARRAY",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "peoples",
+				"type": "ARRAY",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "sentiment",
+				"type": "character varying",
+				"precision": 0,
+				"scale": 0
+			},
+			{
+				"name": "category",
+				"type": "text",
+				"precision": 0,
+				"scale": 0
+			}
+		],
+		"typeProperties": {
+			"schema": "public",
+			"table": "callcenter"
+		}
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}

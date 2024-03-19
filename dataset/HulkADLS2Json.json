@@ -1,0 +1,62 @@
+{
+	"name": "HulkADLS2Json",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "HulkADLSGen2",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "json",
+				"fileSystem": "hulkdfs"
+			}
+		},
+		"schema": {
+			"type": "object",
+			"properties": {
+				"Volcano Name": {
+					"type": "string"
+				},
+				"Country": {
+					"type": "string"
+				},
+				"Region": {
+					"type": "string"
+				},
+				"Location": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string"
+						},
+						"coordinates": {
+							"type": "array",
+							"items": {
+								"type": "number"
+							}
+						}
+					}
+				},
+				"Elevation": {
+					"type": "integer"
+				},
+				"Type": {
+					"type": "string"
+				},
+				"Status": {
+					"type": "string"
+				},
+				"Last Known Eruption": {
+					"type": "string"
+				},
+				"id": {
+					"type": "string"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}

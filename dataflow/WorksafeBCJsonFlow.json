@@ -1,0 +1,136 @@
+{
+	"name": "WorksafeBCJsonFlow",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "WorksafeBCJsonFiles",
+						"type": "DatasetReference"
+					},
+					"name": "WorksafeBCJsonStream"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "AzurePostgreSqlTable1",
+						"type": "DatasetReference"
+					},
+					"name": "CosmosDBSink",
+					"description": "Add a CosmosDB PostgreSQL sink"
+				}
+			],
+			"transformations": [
+				{
+					"name": "SelectRelevantColumns"
+				},
+				{
+					"name": "ETL",
+					"description": "Doing some ETL"
+				},
+				{
+					"name": "ReorganiseColumns"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     Filename as string",
+				"}",
+				"source(output(",
+				"          source as string,",
+				"          timeStamp as string,",
+				"          durationInTicks as integer,",
+				"          duration as string,",
+				"          combinedRecognizedPhrases as (channel as integer, lexical as string, itn as string, maskedITN as string, display as string)[],",
+				"          recognizedPhrases as (recognitionStatus as string, channel as integer, speaker as integer, offset as string, duration as string, offsetInTicks as integer, durationInTicks as integer, nBest as (confidence as double, lexical as string, itn as string, maskedITN as string, display as string, sentiment as (negative as double, neutral as double, positive as double))[])[],",
+				"          conversation as string,",
+				"          summary as string,",
+				"          topic as string[],",
+				"          key_items as string[],",
+				"          ner as (Companies as string[], People as string[])[],",
+				"          sentiment as string,",
+				"          category as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     documentForm: 'singleDocument',",
+				"     partitionBy('hash', 1)) ~> WorksafeBCJsonStream",
+				"WorksafeBCJsonStream select(mapColumn(",
+				"          source,",
+				"          timestamp = timeStamp,",
+				"          duration,",
+				"          summary,",
+				"          topics = topic,",
+				"          keyitems = key_items,",
+				"          ner,",
+				"          sentiment,",
+				"          category",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectRelevantColumns",
+				"SelectRelevantColumns derive(callid = regexExtract(at(split(source, '--'), 1), '(\\\\d+)', 1),",
+				"          userid = at(split(at(split(source, '--'), 2), '%'), 1),",
+				"          sentiment = initCap(sentiment),",
+				"          category = initCap(category),",
+				"          timestamp = toTimestamp(timestamp, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"),",
+				"          companies = at(ner, 1).Companies,",
+				"          peoples = at(ner, 1).People) ~> ETL",
+				"ETL select(mapColumn(",
+				"          userid,",
+				"          callid,",
+				"          timestamp,",
+				"          duration,",
+				"          summary,",
+				"          topics,",
+				"          keyitems,",
+				"          companies,",
+				"          peoples,",
+				"          sentiment,",
+				"          category",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> ReorganiseColumns",
+				"ReorganiseColumns sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          userid as string,",
+				"          callid as string,",
+				"          timestamp as timestamp,",
+				"          duration as string,",
+				"          summary as string,",
+				"          topics as string[],",
+				"          keyitems as string[],",
+				"          companies as string[],",
+				"          peoples as string[],",
+				"          sentiment as string,",
+				"          category as string",
+				"     ),",
+				"     stagingSchemaName: 'public',",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          userid,",
+				"          callid,",
+				"          timestamp,",
+				"          duration,",
+				"          summary,",
+				"          topics,",
+				"          keyitems,",
+				"          companies,",
+				"          peoples,",
+				"          sentiment,",
+				"          category",
+				"     ),",
+				"     partitionBy('hash', 1)) ~> CosmosDBSink"
+			]
+		}
+	}
+}
